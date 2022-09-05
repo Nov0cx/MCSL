@@ -24,9 +24,10 @@ typedef enum {
 typedef struct {
     TokenType type;
     char* data;
+    int line, column;
 } Token;
 
-Token* token_new(TokenType type, char* data);
+Token* token_new(TokenType type, char* data, int line, int column);
 void token_free(Token* token);
 char *token_to_string(Token* token);
 

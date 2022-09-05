@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include "utils/Error.h"
 
 Lexer *lexer_new(char *source)
 {
@@ -33,6 +34,11 @@ List *lexer_tokenize(Lexer *lexer)
     return tokens;
 }
 
+static char is_whitespace(char c)
+{
+    return c == ' ' || c == '\t' || c == '\r' || c == '\n';
+}
+
 Token *lexer_next_token(Lexer *lexer)
 {
     switch (lexer->source[lexer->position])
@@ -45,73 +51,67 @@ Token *lexer_next_token(Lexer *lexer)
             return lexer_next_token(lexer);
         case '+':
         {
-            Token *t = token_new(TOKEN_PLUS, "+");
-            lexer->position++;
-            return t;
-        }
-        case '-':
-        {
-            Token *t = token_new(TOKEN_MINUS, "-");
+            Token *t = token_new(TOKEN_PLUS, "+", lexer->line, lexer->column);
             lexer->position++;
             return t;
         }
         case '*':
         {
-            Token *t = token_new(TOKEN_MULTIPLY, "*");
+            Token *t = token_new(TOKEN_MULTIPLY, "*", lexer->line, lexer->column);
             lexer->position++;
             return t;
         }
         case '/':
         {
-            Token *t = token_new(TOKEN_DIVIDE, "/");
+            Token *t = token_new(TOKEN_DIVIDE, "/", lexer->line, lexer->column);
             lexer->position++;
             return t;
         }
         case '(':
         {
-            Token *t = token_new(TOKEN_LPAREN, "(");
+            Token *t = token_new(TOKEN_LPAREN, "(", lexer->line, lexer->column);
             lexer->position++;
             return t;
         }
         case ')':
         {
-            Token *t = token_new(TOKEN_RPAREN, ")");
+            Token *t = token_new(TOKEN_RPAREN, ")", lexer->line, lexer->column);
             lexer->position++;
             return t;
         }
         case '{':
         {
-            Token *t = token_new(TOKEN_LBRACE, "{");
+            Token *t = token_new(TOKEN_LBRACE, "{", lexer->line, lexer->column);
             lexer->position++;
             return t;
         }
         case '}':
         {
-            Token *t = token_new(TOKEN_RBRACE, "}");
+            Token *t = token_new(TOKEN_RBRACE, "}", lexer->line, lexer->column);
             lexer->position++;
             return t;
         }
         case ';':
         {
-            Token *t = token_new(TOKEN_SEMICOLON, ";");
+            Token *t = token_new(TOKEN_SEMICOLON, ";", lexer->line, lexer->column);
             lexer->position++;
             return t;
         }
         case ',':
         {
-            Token *t = token_new(TOKEN_COMMA, ",");
+            Token *t = token_new(TOKEN_COMMA, ",", lexer->line, lexer->column);
             lexer->position++;
             return t;
         }
         case ':':
         {
-            Token *t = token_new(TOKEN_COLON, ":");
+            Token *t = token_new(TOKEN_COLON, ":", lexer->line, lexer->column);
             lexer->position++;
             return t;
         }
         case '=':
         {
-            Token *t = token_new(TOKEN_EQUAL, "=");
+            Token *t = token_new(TOKEN_EQUAL, "=", lexer->line, lexer->column);
             lexer->position++;
             return t;
         }
@@ -123,6 +123,25 @@ Token *lexer_next_token(Lexer *lexer)
                 return token_new(TOKEN_GREATER_THAN, ">");*/
         case '"':
             return lexer_string(lexer);
+        case '-':
+        {
+            if (lexer->source[lexer->position + 1] == '>')
+            {
+                Token *t = token_new(TOKEN_ARROW, "->", lexer->line, lexer->column);
+                lexer->position += 2;
+                return t;
+            } else
+            {
+                if (is_whitespace(lexer->source[lexer->position + 1]))
+                {
+                    Token *t = token_new(TOKEN_MINUS, "-", lexer->line, lexer->column);
+                    lexer->position++;
+                    return t;
+                }
+                MCSL_ERROR_AT(lexer->line, lexer->column, "Unexpected character: %c", lexer->source[lexer->position]);
+                return token_new(TOKEN_EOF, "", lexer->line, lexer->column);
+            }
+        }
         case '0':
         case '1':
         case '2':
@@ -136,7 +155,7 @@ Token *lexer_next_token(Lexer *lexer)
             return lexer_number(lexer);
         case '\0':
         {
-            Token *t = token_new(TOKEN_EOF, "EOF");
+            Token *t = token_new(TOKEN_EOF, "EOF", lexer->line, lexer->column);
             lexer->position++;
             return t;
         }
@@ -174,7 +193,7 @@ Token *lexer_string(Lexer *lexer)
     }
     string[position - lexer->position] = '\0';
     lexer->position = position + 1;
-    return token_new(TOKEN_STRING, string);
+    return token_new(TOKEN_STRING, string, lexer->line, lexer->column);
 }
 
 Token *lexer_number(Lexer *lexer)
@@ -189,23 +208,26 @@ Token *lexer_number(Lexer *lexer)
     }
     number[position - lexer->position] = '\0';
     lexer->position = position;
-    return token_new(TOKEN_NUMBER, number);
+    return token_new(TOKEN_NUMBER, number, lexer->line, lexer->column);
 }
 
 Token *lexer_identifier(Lexer *lexer)
 {
     char *identifier = malloc(sizeof(char));
     int position = lexer->position;
-    identifier = realloc(identifier, sizeof(char) * (position - lexer->position + 2));
-    identifier[position - lexer->position] = lexer->source[position];
-    position++;
-    while (isalpha(lexer->source[position]) || isdigit(lexer->source[position]))
+    if (isalpha(lexer->source[position]))
     {
-        identifier = realloc(identifier, sizeof(char) * (position - lexer->position + 2));
-        identifier[position - lexer->position] = lexer->source[position];
-        position++;
+        while (isalpha(lexer->source[position]) || isdigit(lexer->source[position]))
+        {
+            identifier = realloc(identifier, sizeof(char) * (position - lexer->position + 2));
+            identifier[position - lexer->position] = lexer->source[position];
+            position++;
+        }
+        identifier[position - lexer->position] = '\0';
+        lexer->position = position;
+        return token_new(TOKEN_WORD, identifier, lexer->line, lexer->column);
+    } else
+    {
+        MCSL_ERROR_AT(lexer->line, lexer->column, "Unexpected character '%c'", lexer->source[position]);
     }
-    identifier[position - lexer->position] = '\0';
-    lexer->position = position;
-    return token_new(TOKEN_WORD, identifier);
 }

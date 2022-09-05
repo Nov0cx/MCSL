@@ -1,11 +1,14 @@
 #include "Token.h"
 #include <stdlib.h>
+#include <string.h>
 
-Token *token_new(TokenType type, char *data)
+Token *token_new(TokenType type, char *data, int line, int column)
 {
     Token *token = malloc(sizeof(Token));
     token->type = type;
     token->data = data;
+    token->line = line;
+    token->column = column;
     return token;
 }
 

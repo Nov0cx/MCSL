@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "MCSL.h"
+#include "MCSL/MCSL.h"
 
 char* ReadFile(char *filename)
 {
@@ -25,7 +25,7 @@ char* ReadFile(char *filename)
 
         // fread doesn't set it so put a \0 in the last position
         // and buffer is now officially a string
-        buffer[string_size] = '\0';
+        buffer[read_size] = '\0';
 
         // Always remember to close the file.
         fclose(handler);
@@ -52,6 +52,9 @@ int main()
         Token* token = list_get(tokens, i);
         printf("%s\n", token_to_string(token));
     }
+
+    printf("----------------\n");
+    AST* ast = parser_parse(parser_new(tokens));
 
     return 0;
 }
